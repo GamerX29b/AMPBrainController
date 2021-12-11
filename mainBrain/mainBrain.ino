@@ -14,8 +14,13 @@ const int ledPin =  13;      // Номер выхода куда подключ�
 const int transistorBaklightPin =  10;      // Номер выхода куда подключено питание
 const int rs = 12, en = 11, d4 = 8, d5 = 7, d6 = 6, d7 = 5; // номера куда подключен дисплей
 int buttonState = 0;         // variable for reading the pushbutton status
+
 bool powerUp = false;          //Включение питания
+bool powerUpOld = false;  
+
 int volume = -60;           //Громкость по-умолчанию в dB
+byte incomingByte; //Приём сигнала включения
+
 MicroDS18B20<2> sensor1;
 
 EncButton<EB_TICK, A3, A2, A1> enc; //sw, DT, CLK
@@ -27,7 +32,7 @@ void setup() {
   pinMode(transistorBaklightPin, OUTPUT); //Транзистор подсветки LCD
   pinMode(A0, INPUT); //Кнопка включения
   enc.counter = 100;      // изменение счётчика
-  
+  Serial.begin(9600);
   lcd.begin(24, 2);
 }
 
@@ -36,6 +41,18 @@ uint32_t btnTimer = 0;
 void loop() {
   enc.tick();
   buttonState = digitalRead(A0);
+  if (Serial.available() > 0) {
+    incomingByte = Serial.read();
+    
+    if(incomingByte == '1'){
+      powerUp = true;
+
+    }
+    else if (incomingByte == '0'){
+      powerUp = false;
+    }
+  }
+  
 
   //Убавить громкость
   if (enc.isLeft()) {
@@ -76,19 +93,12 @@ void loop() {
   if (buttonState == HIGH && powerUp && millis() - btnTimer > 1000){
     btnTimer = millis();
     powerUp = false;
-    lcd.setCursor(5, 1);
-    lcd.print("Offline");
-    lcd.clear();
   }
 
   //Нажатие кнопки питания для включения
   if (buttonState == HIGH && !powerUp && millis() - btnTimer > 1000){
     btnTimer = millis();
     powerUp = true;
-    lcd.clear();
-    lcd.setCursor(6, 0);
-    lcd.print("Online - 666");
-
   }
 
   sensor1.requestTemp();
@@ -97,11 +107,21 @@ void loop() {
   
 
   //Включение схемы
-  if (powerUp) {
-    digitalWrite(ledPin, HIGH);
-    digitalWrite(transistorBaklightPin, HIGH);
-  } else {
-    digitalWrite(ledPin, LOW);
-    digitalWrite(transistorBaklightPin, LOW);
+  if (powerUp != powerUpOld){
+    if (powerUp) {
+      digitalWrite(ledPin, HIGH);
+      digitalWrite(transistorBaklightPin, HIGH);
+      powerUpOld = true;
+      lcd.clear();
+      lcd.setCursor(6, 0);
+      lcd.print("Online - 666");
+    } else {
+      digitalWrite(ledPin, LOW);
+      digitalWrite(transistorBaklightPin, LOW);
+      powerUpOld = false;
+      lcd.setCursor(5, 1);
+      lcd.print("Offline");
+      lcd.clear();
+    }
   }
 }
